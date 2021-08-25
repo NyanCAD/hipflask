@@ -2,7 +2,7 @@
 
 A ClojureScript atom interface to a PouchDB database.
 
-Useful for making reactive apps that sync.
+Useful for making reactive [rum](https://github.com/tonsky/rum) apps that sync.
 
 ## Usage
 
