@@ -27,7 +27,7 @@
 
   IDeref
   (-deref [_this]
-    (go (<p! (.get db key))))
+    (go (js->clj (<p! (.get db key)))))
 
   ISwap
   (-swap! [_a f]          (pouch-swap! db key validator f))
