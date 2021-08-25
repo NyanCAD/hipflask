@@ -1,0 +1,11 @@
+{
+  "name": "hipflask",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "shadow-cljs": "2.15.5"
+  },
+  "dependencies": {
+    "pouchdb": "^7.2.2"
+  }
+}
