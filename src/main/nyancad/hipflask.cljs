@@ -3,6 +3,9 @@
             [cljs.core.async :refer [go go-loop <!]]
             [cljs.core.async.interop :refer-macros [<p!]]))
 
+(defn pouchdb [name] (PouchDB. name))
+(defn put [db doc] (.put db (clj->js doc)))
+
 (defn errorcode [^js err]
   (.log js/console err)
   (.-status (.-cause err)))
@@ -14,7 +17,7 @@
           res (try
                 (when-not (nil? validator)
                   (assert (validator updated)))
-                (<p! (.put db (clj->js updated)))
+                (<p! (put db updated))
                 (catch :default err err))]
       (if (instance? js/Error res)
         (if (= 409 (errorcode res))
@@ -22,7 +25,7 @@
           (throw res))
         updated)))) 
 
-(deftype PAtom [db key validator ^:mutable watches]
+(deftype PAtom [db key changes validator ^:mutable watches]
   IAtom
 
   IDeref
@@ -40,12 +43,20 @@
   (-add-watch [_this key f] (set! watches (assoc watches key f)))
   (-remove-watch [_this key] (set! watches (dissoc watches key))))
 
-(defn patom [db key]
-  (let [p (PAtom. db key nil nil)]
-    (-> db
-        (.changes #js{:since "now"
-                      :live true
-                      :include_docs true
-                      :doc_ids #js[key]})
-        (.on "change" (fn [change] (-notify-watches p nil (js->clj (.-doc change))))))
+(defn watch-changes [db key wp]
+  (let [ch (.changes db #js{:since "now"
+                            :live true
+                            :include_docs true
+                            :doc_ids #js[key]})]
+    (.on ch "change" (fn [change]
+                       (if-let [myp (.deref wp)]
+                         (-notify-watches myp nil (js->clj (.-doc change)))
+                         (.cancel ch))))))
+
+(defn ephemeral-atom [db key]
+  (PAtom. db key nil nil nil))
+
+(defn live-atom [db key]
+  (let [p (PAtom. db key nil nil nil)]
+    (watch-changes db key (js/WeakRef. p))
     p))
