@@ -8,7 +8,14 @@ Useful for making reactive [rum](https://github.com/tonsky/rum) apps that sync.
 
 ```clojure
 (def db (pouchdb "test"))
-(put db {:_id "doc" :number 1})
-(def pa (patom db "doc"))
-(go (println (<! (swap! pa update "number" inc))))
+(put db {:_id "group/doc1" :number 1})
+(put db {:_id "group/doc2" :number 1})
+(def pa (pouch-atom db "group"))
+(go (println (<!
+  (swap! pa update-keys #{"group/doc1" "group/doc2"} update "number" inc))))
+```
+
+With Reagent, make sure to use a ratom as the cache.
+```clojure
+(pouch-atom db "group" (r/atom {}))
 ```
