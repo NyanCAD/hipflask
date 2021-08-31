@@ -39,20 +39,21 @@
                               100))))))
 
 (deftest atom-update
-  (let [db (pouchdb "testdb")
+  (let [n 10
+        db (pouchdb "testdb")
         pa (pouch-atom db "group")] ; make an atom
     (async done
            (go
              (<! (init? pa)) ; wait for it to initialise
-             (let [chs1 (doall (for [_ (range 100)]
+             (let [chs1 (doall (for [_ (range n)]
                                  (swap! pa update-in ["group/doc0" "number"] inc)))
-                   chs2 (doall (for [_ (range 100)]
+                   chs2 (doall (for [_ (range n)]
                                  (swap! pa update-keys #{"group/doc1" "group/doc2"} update "number" inc)))]
                (doseq [ch chs1] (<! ch))
                (doseq [ch chs2] (<! ch))
-               (is (= 100 (get-in @pa ["group/doc0" "number"])))
-               (is (= 100 (get-in @pa ["group/doc1" "number"])))
-               (is (= 100 (get-in @pa ["group/doc2" "number"])))
+               (is (= n (get-in @pa ["group/doc0" "number"])))
+               (is (= n (get-in @pa ["group/doc1" "number"])))
+               (is (= n (get-in @pa ["group/doc2" "number"])))
                (done))))))
 
 (deftest atom-delete
@@ -64,5 +65,8 @@
              (<! (init? pa1))
              (<! (init? pa2))
              (<! (swap! pa1 dissoc "group/doc1"))
-             (println @pa1 @pa2)
-             (done)))))
+             (js/setTimeout #(do (is (=  @pa1 @pa2))
+                                 (is (not (contains? @pa1 "group/doc1")))
+                                 (is (not (contains? @pa2 "group/doc1")))
+                                 (done))
+                            100)))))

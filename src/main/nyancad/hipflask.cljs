@@ -10,8 +10,32 @@
 (defn alldocs [db options] ^js (.allDocs db options))
 
 (defn update-keys
+  "Apply f to every valen in keys"
   ([m keys f] (into m (map #(vector % (f (get m %)))) keys))
   ([m keys f & args] (into m (map #(vector % (apply f (get m %) args))) keys)))
+
+(defn- tombstone-conj [m [k v]]
+  (if (nil? v)
+    (dissoc m k)
+    (assoc m k v)))
+
+(defn- tombstone-conj! [m [k v]]
+  (if (nil? v)
+    (dissoc! m k)
+    (assoc! m k v)))
+
+; like into, but dissoc's nil values
+(defn- tombstone-into
+  ([] [])
+  ([to] to)
+  ([to from]
+    (if (implements? IEditableCollection to)
+      (persistent! (reduce tombstone-conj! (transient to) from))
+      (reduce tombstone-conj to from)))
+  ([to xform from]
+     (if (implements? IEditableCollection to)
+       (persistent! (transduce xform tombstone-conj! (transient to) from))
+       (transduce xform tombstone-conj to from))))
 
 (defn- docs-into [m ^js docs]
   (into m (map #(vector (get % "id") (get % "doc")))
@@ -24,48 +48,64 @@
                              :endkey (str group sep "\ufff0")})]
     (go (docs-into {} (<p! docs)))))
 
-(defn watch-changes [db group cachewr]
+(defn- watch-changes [db group cachewr]
   (let [ch ^js (.changes db #js{:since "now"
                                 :live true
                                 :include_docs true
                                 :filter #(starts-with? ^js (.-_id %) (str group sep))})]
     (.on ch "change" (fn [change]
                        (let [doc (js->clj ^js (.-doc change))
-                             id (get doc "_id")]
+                             id (get doc "_id")
+                             del? (get doc "_deleted")]
                          (if-let [cache (.deref cachewr)]
-                           (swap! cache assoc id doc)
+                           (if del?
+                             (swap! cache dissoc id)
+                             (swap! cache assoc id doc))
                            (.cancel ch)))))))
 
-(defn pouch-swap! [db cache f x & args]
-  (letfn [(dissok [docs ^js doc] ; remove OK keys
+(defn- pouch-swap! [db cache f x & args]
+  (letfn [(prepare [old new] ; get the new values, filling in _id, _ref, _deleted
+            (for [[id {rev "_rev"}] old]
+              (if-let [newdoc (get new id)]
+                (if rev
+                  (assoc newdoc "_id" id "_rev" rev) ; make sure new value has correct id and rev
+                  (assoc newdoc "_id" id)) ; new doc, add id
+                {"_id" id "_rev" rev "_deleted" true}))) ; deleted
+          (dissok [docs ^js doc] ; remove OK documents (finished)
             (if (.-ok doc)
               (dissoc docs (.-id doc))
               (do
                 ;; (js/console.log "update error!" doc)
                 docs)))
-          (assok [cache doc] ; assoc OK documents revision into cache
+          (assok [cache doc] ; proccess OK (finished) documents
             (let [id (.-id doc)
                   rev (.-rev doc)]
               (if rev
-                (assoc-in cache [id "_rev"] rev)
-                (dissoc cache id))))
+                (if (contains? cache id)
+                  (assoc-in cache [id "_rev"] rev) ;done, update rev
+                  (assoc cache id nil)) ; delete, assoc nil so we can delete later
+                (dissoc cache id)))) ; conflict, remove
           (keyset [key] ; the set of keys to update
             (cond
               (set? key) key ; update-keys
               (coll? key) #{(first key)} ; update-in
               :default #{key}))] ; update/assoc/dissoc/etc.
+    ; build a map with only the keys to update
     (go-loop [docs (into {} (map (let [c @cache] #(vector % (get c %)))) (keyset x))]
       (let [updocs (apply f docs (if (set? x) (keys docs) x) args) ; apply f
-            res (<p! (bulkdocs db (vals updocs))) ; try to put the updated docs
+            prepdocs (prepare docs updocs) ; prepare for sending to PouchDB
+            res (<p! (bulkdocs db prepdocs)) ; try to put the updated docs
             ;400 errors get thrown, not returned
             errdocs (reduce dissok updocs res) ; remove the OK docs from the active set
-            donedocs (reduce assok updocs res)] ; update the revisions of the OK docs in the cache
-        ;; (println errdocs donedocs)
-        (swap! cache into donedocs)
-        (if (empty? errdocs)
-          @cache
+            donedocs (reduce assok updocs res)] ; update the revisions of the OK docs
+        ; update OK docs in the cach, we're done with them
+        ; we use tombstone-into here, so that nil values from assok get removed from the cache
+        (swap! cache tombstone-into donedocs)
+        (if (empty? errdocs) ; are there any conflicst left to retry?
+          @cache ; done
+          ; fetch the latest documents from the DB for all conflicts
           (let [p (alldocs db (clj->js {:include_docs true :keys (keys errdocs)}))]
-            (recur (docs-into {} (<p! p)))))))))
+            (recur (docs-into {} (<p! p))))))))) ; recur with remaining documents
 
 (deftype PAtom [db group cache init?]
   IAtom
