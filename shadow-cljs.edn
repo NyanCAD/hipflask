@@ -11,6 +11,11 @@
 
  :builds
 {:app {:target :browser
-        :output-dir "public/js"
-        :asset-path "/js"
-        :modules {:main {:entries [nyancad.hipflask]}}}}}
+       :output-dir "public/js"
+       :asset-path "/js"
+       :modules {:main {:entries [nyancad.hipflask]}}}
+ :test
+ {:target    :node-test
+  :output-to "node-tests.js"
+  :ns-regexp "-test$"
+  :autorun   true}}}
