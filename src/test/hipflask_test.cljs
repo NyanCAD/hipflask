@@ -30,7 +30,7 @@
                ; assoc a few docs into the atom
                (doseq [i (range 3 6)
                        :let [id (str "group/doc" i)]]
-                 (<! (swap! pa2 assoc id {"_id" id "number" 0})))
+                 (<! (swap! pa2 assoc id {"number" 0})))
                ; wait for changes to propagate, and check equality
                ; also verify "test" didn't get in
                (js/setTimeout #(do (is (=  @pa1 @pa2))
