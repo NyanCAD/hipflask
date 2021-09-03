@@ -1,0 +1,13 @@
+{
+  "name": "gcc",
+  "version": "0.0.1",
+  "private": true,
+  "devDependencies": {
+    "shadow-cljs": "2.15.8"
+  },
+  "dependencies": {
+    "pouchdb": "7.2.2",
+    "react": "17.0.1",
+    "react-dom": "17.0.1"
+  }
+}
