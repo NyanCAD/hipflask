@@ -124,6 +124,6 @@
   ([db group cache]
    (watch-changes db group (js/WeakRef. cache))
    (PAtom. db group cache
-           (go (reset! cache (<! (get-group db "group")))))))
+           (go (reset! cache (<! (get-group db group)))))))
 
 (defn init? [^PAtom pa] (.-init? pa))
