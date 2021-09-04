@@ -80,3 +80,16 @@
              (<! (init? pa))
              (<! (swap! pa update-in ["group:doc0" "number"] inc))
              (done)))))
+
+(deftest atom-identity
+  (let [db (pouchdb "testdb")
+        pa (pouch-atom db "group")]
+    (async done
+           (go
+             (<! (init? pa))
+             (let [de @pa
+                   rev (get-in de ["group:doc0" "_rev"])]
+               (<! (swap! pa update "group:doc0" identity))
+               (is (= rev (get-in @pa ["group:doc0" "_rev"])))
+               (is (identical? de  @pa)))
+             (done)))))
