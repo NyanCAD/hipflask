@@ -19,3 +19,7 @@ With Reagent, make sure to use a ratom as the cache.
 ```clojure
 (pouch-atom db "group" (r/atom {}))
 ```
+
+## Examples
+
+* [Global Cookie Clicker](http://wishfulcoding.nl/gcc/): `examples/gcc`
