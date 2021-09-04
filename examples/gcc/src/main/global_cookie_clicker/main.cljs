@@ -7,7 +7,11 @@
 (def clicker-price 50)
 
 (def db (hf/pouchdb "cookies"))
-(def me (random-uuid))
+(def me (if-let [uuid (js/localStorage.getItem "user")]
+          uuid
+          (let [uuid (str (random-uuid))]
+            (js/localStorage.setItem "user" uuid)
+            uuid)))
 
 (def rginger (r/atom {}))
 (def ginger (hf/pouch-atom db "gingerbread" rginger))
@@ -21,8 +25,8 @@
 (defn count-mine [a type]
   (get-in @a [(str (.-group a) hf/sep me) type] 0))
 
-(defn make-cookie [a _]
-  (swap! a update-in [(str (.-group a) hf/sep me) "cookies"] inc))
+(defn make-cookie [a n _]
+  (swap! a update-in [(str (.-group a) hf/sep me) "cookies"] #(+ % n)))
 
 (defn buy-clicker [a _]
   (swap! a (fn [doc key]
@@ -35,17 +39,15 @@
                  doc)))
          (str (.-group a) hf/sep me)))
 
-(defn add-pouch-watch [pa key f]
-  (add-watch (.-cache pa) key (fn [key _ old new] (f key pa old new))))
+(defn do-clickers []
+  (doseq [a [choco ginger]]
+    (make-cookie a (count-mine a "clickers") nil)))
 
-(defn start-clicker [key a old new]
-  (when (> (get-in new [(str key hf/sep me) "clickers"] 0)
-           (get-in old [(str key hf/sep me) "clickers"] 0))
-    (println "new clicker added")
-    (js/setInterval #(make-cookie a %) 1000)))
+(defn do-sync []
+  (.sync db "https://c6be5bcc-59a8-492d-91fd-59acc17fef02-bluemix.cloudantnosqldb.appdomain.cloud/cookies"))
 
-(add-pouch-watch ginger "gingerbread" start-clicker)
-(add-pouch-watch choco "chocolate" start-clicker)
+(defonce clicker (js/setInterval do-clickers 1000))
+(defonce syncer (js/setInterval do-sync 5964))
 
 (defn main []
   [:div
@@ -53,12 +55,11 @@
    [:p "You have " (count-mine choco "clickers") " of the global "(count-global choco "clickers") " chocolate clickers"]
    [:p "You have " (count-mine ginger "cookies") " of the global "(count-global ginger "cookies") " gingerbread cookies"]
    [:p "You have " (count-mine ginger "clickers") " of the global "(count-global ginger "clickers") " gingerbread clickers"]
-   [:button {:on-click #(make-cookie choco %)} "Chocolate cookie!"]
+   [:button {:on-click #(make-cookie choco 1 %)} "Chocolate cookie!"]
    [:button {:on-click #(buy-clicker choco %)} "Chocolate clicker! (50)"]
-   [:button {:on-click #(make-cookie ginger %)} "Gingerbread cookie!"]
+   [:button {:on-click #(make-cookie ginger 1 %)} "Gingerbread cookie!"]
    [:button {:on-click #(buy-clicker ginger %)} "Gingerbread clicker! (50)"]])
 
 (defn ^:dev/after-load init []
-  (.sync db "https://c6be5bcc-59a8-492d-91fd-59acc17fef02-bluemix.cloudantnosqldb.appdomain.cloud/cookies", #js{:live true, :retry true})
   (rd/render [main]
              (.getElementById js/document "root")))
