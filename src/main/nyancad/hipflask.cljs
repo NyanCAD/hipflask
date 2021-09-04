@@ -41,7 +41,7 @@
   (into m (map #(vector (get % "id") (get % "doc")))
         (js->clj (.-rows docs))))
 
-(def sep "/")
+(def sep ":")
 (defn- get-group [db group]
   (let [docs (alldocs db #js{:include_docs true
                              :startkey (str group sep)
@@ -114,7 +114,7 @@
   (-deref [_this] @cache)
 
   ISwap
-  (-swap! [_a _f]          (throw (js/Error "Pouch atom assumes first argument is a key")))
+  (-swap! [_a _f]         (throw (js/Error "Pouch atom assumes first argument is a key")))
   (-swap! [_a f x]        (pouch-swap! db cache f x))
   (-swap! [_a f x y]      (pouch-swap! db cache f x y))
   (-swap! [_a f x y more] (apply pouch-swap! db cache f x y more))
