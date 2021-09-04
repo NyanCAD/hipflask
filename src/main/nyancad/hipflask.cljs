@@ -117,7 +117,12 @@
   (-swap! [_a _f]          (throw (js/Error "Pouch atom assumes first argument is a key")))
   (-swap! [_a f x]        (pouch-swap! db cache f x))
   (-swap! [_a f x y]      (pouch-swap! db cache f x y))
-  (-swap! [_a f x y more] (apply pouch-swap! db cache f x y more)))
+  (-swap! [_a f x y more] (apply pouch-swap! db cache f x y more))
+
+  IWatchable
+  (-notify-watches [_this old new] (-notify-watches cache old new))
+  (-add-watch [this key f]         (-add-watch cache key (fn [key _ old new] (f key this old new))))
+  (-remove-watch [_this key]       (-remove-watch cache key)))
 
 (defn pouch-atom
   ([db group] (pouch-atom db group (atom {})))

@@ -70,3 +70,13 @@
                                  (is (not (contains? @pa2 "group/doc1")))
                                  (done))
                             100)))))
+
+(deftest atom-watch
+  (let [db (pouchdb "testdb")
+        pa (pouch-atom db "group")]
+    (add-watch pa :foo (fn [_ ref _ _] (is (identical? ref pa))))
+    (async done
+           (go
+             (<! (init? pa))
+             (<! (swap! pa update-in ["group/doc0" "number"] inc))
+             (done)))))
