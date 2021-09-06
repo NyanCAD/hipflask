@@ -38,8 +38,8 @@
      (transduce xform tombstone-conj to from))))
 
 (defn- docs-into [m ^js docs]
-  (into m (map #(vector (get % "id") (get % "doc")))
-        (js->clj (.-rows docs))))
+  (into m (map #(vector (get % :id) (get % :doc)))
+        (js->clj (.-rows docs) :keywordize-keys true)))
 
 (def sep ":")
 (defn- get-group [db group]
@@ -54,9 +54,9 @@
                                 :include_docs true
                                 :filter #(starts-with? ^js (.-_id %) (str group sep))})]
     (.on ch "change" (fn [change]
-                       (let [doc (js->clj ^js (.-doc change))
-                             id (get doc "_id")
-                             del? (get doc "_deleted")]
+                       (let [doc (js->clj ^js (.-doc change) :keywordize-keys true)
+                             id (get doc :_id)
+                             del? (get doc :_deleted)]
                          (if-let [cache (.deref cachewr)]
                            (if del?
                              (swap! cache dissoc id)
@@ -65,12 +65,12 @@
 
 (defn- pouch-swap! [db cache f x & args]
   (letfn [(prepare [old new] ; get the new values, filling in _id, _ref, _deleted
-            (for [[id {rev "_rev"}] old]
+            (for [[id {rev :_rev}] old]
               (if-let [newdoc (get new id)]
                 (if rev
-                  (assoc newdoc "_id" id "_rev" rev) ; make sure new value has correct id and rev
-                  (assoc newdoc "_id" id)) ; new doc, add id
-                {"_id" id "_rev" rev "_deleted" true}))) ; deleted
+                  (assoc newdoc :_id id :_rev rev) ; make sure new value has correct id and rev
+                  (assoc newdoc :_id id)) ; new doc, add id
+                {:_id id :_rev rev :_deleted true}))) ; deleted
           (dissok [docs ^js doc] ; remove OK documents (finished)
             (if (.-ok doc)
               (dissoc docs (.-id doc))
@@ -82,7 +82,7 @@
                   rev (.-rev doc)]
               (if rev
                 (if (contains? cache id)
-                  (assoc-in cache [id "_rev"] rev) ;done, update rev
+                  (assoc-in cache [id :_rev] rev) ;done, update rev
                   (assoc cache id nil)) ; delete, assoc nil so we can delete later
                 (dissoc cache id)))) ; conflict, remove
           (keyset [key] ; the set of keys to update

@@ -26,40 +26,42 @@
   (get-in @a [(str (.-group a) hf/sep me) type] 0))
 
 (defn make-cookie [a n _]
-  (swap! a update-in [(str (.-group a) hf/sep me) "cookies"] #(+ % n)))
+  (swap! a update-in [(str (.-group a) hf/sep me) :cookies] #(+ % n)))
 
 (defn buy-clicker [a _]
   (swap! a (fn [doc key]
-             (let [cookies (get-in doc [key "cookies"] 0)
-                   clickers (get-in doc [key "clickers"] 0)]
+             (let [cookies (get-in doc [key :cookies] 0)
+                   clickers (get-in doc [key :clickers] 0)]
                (if (>= cookies clicker-price)
                  (update doc key assoc
-                         "cookies" (- cookies clicker-price)
-                         "clickers" (inc clickers))
+                         :cookies (- cookies clicker-price)
+                         :clickers (inc clickers))
                  doc)))
          (str (.-group a) hf/sep me)))
 
 (defn do-clickers []
   (doseq [a [choco ginger]]
-    (make-cookie a (count-mine a "clickers") nil)))
+    (make-cookie a (count-mine a :clickers) nil)))
 
 (defn do-sync []
-  (.sync db "https://c6be5bcc-59a8-492d-91fd-59acc17fef02-bluemix.cloudantnosqldb.appdomain.cloud/cookies"))
+  (.sync db "https://c6be5bcc-59a8-492d-91fd-59acc17fef02-bluemix.cloudantnosqldb.appdomain.cloud/cookies"
+         #(js/setTimeout do-sync 5000)))
 
 (defonce clicker (js/setInterval do-clickers 1000))
-(defonce syncer (js/setInterval do-sync 5964))
+(defonce syncer (js/setTimeout do-sync 5000))
 
 (defn main []
   [:div
-   [:p "You have " (count-mine choco "cookies") " of the global "(count-global choco "cookies") " chocolate cookies"]
-   [:p "You have " (count-mine choco "clickers") " of the global "(count-global choco "clickers") " chocolate clickers"]
-   [:p "You have " (count-mine ginger "cookies") " of the global "(count-global ginger "cookies") " gingerbread cookies"]
-   [:p "You have " (count-mine ginger "clickers") " of the global "(count-global ginger "clickers") " gingerbread clickers"]
+   [:p "You have " (count-mine choco :cookies) " of the global "(count-global choco :cookies) " chocolate cookies"]
+   [:p "You have " (count-mine choco :clickers) " of the global "(count-global choco :clickers) " chocolate clickers"]
+   [:p "You have " (count-mine ginger :cookies) " of the global "(count-global ginger :cookies) " gingerbread cookies"]
+   [:p "You have " (count-mine ginger :clickers) " of the global "(count-global ginger :clickers) " gingerbread clickers"]
    [:button {:on-click #(make-cookie choco 1 %)} "Chocolate cookie!"]
    [:button {:on-click #(buy-clicker choco %)} "Chocolate clicker! (50)"]
    [:button {:on-click #(make-cookie ginger 1 %)} "Gingerbread cookie!"]
    [:button {:on-click #(buy-clicker ginger %)} "Gingerbread clicker! (50)"]])
 
 (defn ^:dev/after-load init []
+  ;; (.sync db "http://127.0.0.1:5984/cookies" #js{:live true, :retry true})
   (rd/render [main]
              (.getElementById js/document "root")))

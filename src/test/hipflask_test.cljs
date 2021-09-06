@@ -30,7 +30,7 @@
                ; assoc a few docs into the atom
                (doseq [i (range 3 6)
                        :let [id (str "group:doc" i)]]
-                 (<! (swap! pa2 assoc id {"number" 0})))
+                 (<! (swap! pa2 assoc id {:number 0})))
                ; wait for changes to propagate, and check equality
                ; also verify "test" didn't get in
                (js/setTimeout #(do (is (=  @pa1 @pa2))
@@ -46,14 +46,14 @@
            (go
              (<! (init? pa)) ; wait for it to initialise
              (let [chs1 (doall (for [_ (range n)]
-                                 (swap! pa update-in ["group:doc0" "number"] inc)))
+                                 (swap! pa update-in ["group:doc0" :number] inc)))
                    chs2 (doall (for [_ (range n)]
-                                 (swap! pa update-keys #{"group:doc1" "group:doc2"} update "number" inc)))]
+                                 (swap! pa update-keys #{"group:doc1" "group:doc2"} update :number inc)))]
                (doseq [ch chs1] (<! ch))
                (doseq [ch chs2] (<! ch))
-               (is (= n (get-in @pa ["group:doc0" "number"])))
-               (is (= n (get-in @pa ["group:doc1" "number"])))
-               (is (= n (get-in @pa ["group:doc2" "number"])))
+               (is (= n (get-in @pa ["group:doc0" :number])))
+               (is (= n (get-in @pa ["group:doc1" :number])))
+               (is (= n (get-in @pa ["group:doc2" :number])))
                (done))))))
 
 (deftest atom-delete
@@ -78,7 +78,7 @@
     (async done
            (go
              (<! (init? pa))
-             (<! (swap! pa update-in ["group:doc0" "number"] inc))
+             (<! (swap! pa update-in ["group:doc0" :number] inc))
              (done)))))
 
 (deftest atom-identity
@@ -88,8 +88,8 @@
            (go
              (<! (init? pa))
              (let [de @pa
-                   rev (get-in de ["group:doc0" "_rev"])]
+                   rev (get-in de ["group:doc0" :_rev])]
                (<! (swap! pa update "group:doc0" identity))
-               (is (= rev (get-in @pa ["group:doc0" "_rev"])))
+               (is (= rev (get-in @pa ["group:doc0" :_rev])))
                (is (identical? de  @pa)))
              (done)))))
