@@ -2,7 +2,7 @@
   (:require [cljs.test :refer (deftest is async use-fixtures)]
             [cljs.core.async :refer [go go-loop <!]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            [nyancad.hipflask :refer [put pouchdb pouch-atom init? update-keys]]))
+            [nyancad.hipflask :refer [put pouchdb pouch-atom done? update-keys]]))
 
 (use-fixtures :once
   {;:before (fn [] (async done (.destroy (pouchdb "test") #(println "before" (done)))))
@@ -21,12 +21,10 @@
         pa1 (pouch-atom db "group")] ; make the first atom
     (async done
            (go
-             (<! (init? pa1)) ; wait for it to initialise
              ; put a few docs in the db (test changes handler)
              (doseq [i (range 3)]
                (<p! (put db {:_id (str "group:doc" i) :number 0})))
              (let [pa2 (pouch-atom db "group")] ; make another atom
-               (<! (init? pa2)); wait for it to initialize
                ; assoc a few docs into the atom
                (doseq [i (range 3 6)
                        :let [id (str "group:doc" i)]]
@@ -39,12 +37,11 @@
                               100))))))
 
 (deftest atom-update
-  (let [n 10
+  (let [n 100
         db (pouchdb "testdb")
         pa (pouch-atom db "group")] ; make an atom
     (async done
            (go
-             (<! (init? pa)) ; wait for it to initialise
              (let [chs1 (doall (for [_ (range n)]
                                  (swap! pa update-in ["group:doc0" :number] inc)))
                    chs2 (doall (for [_ (range n)]
@@ -62,8 +59,6 @@
         pa2 (pouch-atom db "group")]
     (async done
            (go
-             (<! (init? pa1))
-             (<! (init? pa2))
              (<! (swap! pa1 dissoc "group:doc1"))
              (js/setTimeout #(do (is (=  @pa1 @pa2))
                                  (is (not (contains? @pa1 "group:doc1")))
@@ -77,7 +72,6 @@
     (add-watch pa :foo (fn [_ ref _ _] (is (identical? ref pa))))
     (async done
            (go
-             (<! (init? pa))
              (<! (swap! pa update-in ["group:doc0" :number] inc))
              (done)))))
 
@@ -86,7 +80,7 @@
         pa (pouch-atom db "group")]
     (async done
            (go
-             (<! (init? pa))
+             (<! (done? pa)) ; wait for it to initialise before getting dereference
              (let [de @pa
                    rev (get-in de ["group:doc0" :_rev])]
                (<! (swap! pa update "group:doc0" identity))
