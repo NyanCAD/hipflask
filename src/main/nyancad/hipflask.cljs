@@ -88,6 +88,7 @@
           (keyset [key] ; the set of keys to update
             (cond
               (set? key) key ; update-keys
+              (map? key) (keys key) ; into
               (coll? key) #{(first key)} ; update-in
               :default #{key}))] ; update/assoc/dissoc/etc.
     ; build a map with only the keys to update

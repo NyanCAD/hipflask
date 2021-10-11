@@ -29,6 +29,10 @@
                (doseq [i (range 3 6)
                        :let [id (str "group:doc" i)]]
                  (<! (swap! pa2 assoc id {:number 0})))
+               (<! (swap! pa2 into
+                          {"group:doc6" {:number 0}
+                           "group:doc7" {:number 0}
+                           "group:doc8" {:number 0}}))
                ; wait for changes to propagate, and check equality
                ; also verify "test" didn't get in
                (js/setTimeout #(do (is (=  @pa1 @pa2))
