@@ -58,9 +58,10 @@
                              id (get doc :_id)
                              del? (get doc :_deleted)]
                          (if-let [cache (.deref cachewr)]
-                           (if del?
-                             (swap! cache dissoc id)
-                             (swap! cache assoc id doc))
+                           (when-not (= (get doc :_rev) (get-in @cache [id :_rev]))
+                             (if del?
+                               (swap! cache dissoc id)
+                               (swap! cache assoc id doc)))
                            (.cancel ch)))))))
 
 (defn- pouch-swap! [db cache done? f x & args]
@@ -82,7 +83,7 @@
                   rev (.-rev doc)]
               (if rev
                 (if (contains? cache id)
-                  (assoc-in cache [id :_rev] rev) ;done, update rev
+                  (update cache id assoc :_rev rev :_id id) ;done, update rev
                   (assoc cache id nil)) ; delete, assoc nil so we can delete later
                 (dissoc cache id)))) ; conflict, remove
           (keyset [key] ; the set of keys to update
