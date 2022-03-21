@@ -58,7 +58,8 @@
                              id (get doc :_id)
                              del? (get doc :_deleted)]
                          (if-let [cache (.deref cachewr)]
-                           (when-not (= (get doc :_rev) (get-in @cache [id :_rev]))
+                           (when-not (or (= (get doc :_rev) (get-in @cache [id :_rev]))
+                                         (and del? (not (contains? @cache id))))
                              (if del?
                                (swap! cache dissoc id)
                                (swap! cache assoc id doc)))
