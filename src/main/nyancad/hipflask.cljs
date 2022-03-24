@@ -2,7 +2,7 @@
   (:require ["pouchdb" :as PouchDB]
             [cljs.core.async :refer [go go-loop <!]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            [clojure.string :refer [starts-with?]]))
+            [clojure.string :refer [starts-with? split]]))
 
 (defn pouchdb [name] (PouchDB. name))
 (defn put [db doc] (.put db (clj->js doc)))
@@ -48,22 +48,29 @@
                              :endkey (str group sep "\ufff0")})]
     (go (docs-into {} (<p! docs)))))
 
-(defn- watch-changes [db group cachewr]
+(defn watch-changes [db groups]
+  ; browsers allow 6 concurrent requests per domain
+  ; use one watcher per database
+  ; use a timeout and disable heartbeat to prevent completely locking DB access
+  ; 30s is still pretty horrid but what can you do
   (let [ch ^js (.changes db #js{:since "now"
                                 :live true
-                                :include_docs true
-                                :filter #(starts-with? ^js (.-_id %) (str group sep))})]
+                                :timeout 30000
+                                :heartbeat false
+                                :include_docs true})]
     (.on ch "change" (fn [change]
                        (let [doc (js->clj ^js (.-doc change) :keywordize-keys true)
                              id (get doc :_id)
-                             del? (get doc :_deleted)]
-                         (if-let [cache (.deref cachewr)]
+                             del? (get doc :_deleted)
+                             group (first (split id sep))
+                             db (get groups group)]
+                         (when-let [cache (and db (.-cache db))]
                            (when-not (or (= (get doc :_rev) (get-in @cache [id :_rev]))
                                          (and del? (not (contains? @cache id))))
                              (if del?
                                (swap! cache dissoc id)
-                               (swap! cache assoc id doc)))
-                           (.cancel ch)))))))
+                               (swap! cache assoc id doc)))))))
+    #(.cancel ch)))
 
 (defn- pouch-swap! [db cache done? f x & args]
   (letfn [(prepare [old new] ; get the new values, filling in _id, _ref, _deleted
@@ -134,7 +141,6 @@
 (defn pouch-atom
   ([db group] (pouch-atom db group (atom {})))
   ([db group cache]
-   (watch-changes db group (js/WeakRef. cache))
    (PAtom. db group cache
            (go (reset! cache (<! (get-group db group)))))))
 

@@ -2,7 +2,7 @@
   (:require [cljs.test :refer (deftest is async use-fixtures)]
             [cljs.core.async :refer [go go-loop <!]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            [nyancad.hipflask :refer [put pouchdb pouch-atom done? update-keys]]))
+            [nyancad.hipflask :refer [put pouchdb pouch-atom done? update-keys watch-changes]]))
 
 (use-fixtures :once
   {;:before (fn [] (async done (.destroy (pouchdb "test") #(println "before" (done)))))
@@ -19,12 +19,14 @@
 (deftest atom-init
   (let [db (pouchdb "testdb")
         pa1 (pouch-atom db "group")] ; make the first atom
+    (watch-changes db {"group" pa1})
     (async done
            (go
              ; put a few docs in the db (test changes handler)
              (doseq [i (range 3)]
                (<p! (put db {:_id (str "group:doc" i) :number 0})))
              (let [pa2 (pouch-atom db "group")] ; make another atom
+               (watch-changes db {"group" pa2})
                ; assoc a few docs into the atom
                (doseq [i (range 3 6)
                        :let [id (str "group:doc" i)]]
@@ -61,6 +63,8 @@
   (let [db (pouchdb "testdb")
         pa1 (pouch-atom db "group")
         pa2 (pouch-atom db "group")]
+    (watch-changes db {"group" pa1})
+    (watch-changes db {"group" pa2})
     (async done
            (go
              (<! (swap! pa1 dissoc "group:doc1"))
