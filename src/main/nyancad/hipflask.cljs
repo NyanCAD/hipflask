@@ -48,7 +48,7 @@
                              :endkey (str group sep "\ufff0")})]
     (go (docs-into {} (<p! docs)))))
 
-(defn watch-changes [db groups]
+(defn watch-changes [db & patoms]
   ; browsers allow 6 concurrent requests per domain
   ; use one watcher per database
   ; use a timeout and disable heartbeat to prevent completely locking DB access
@@ -57,14 +57,14 @@
                                 :live true
                                 :timeout 30000
                                 :heartbeat false
-                                :include_docs true})]
+                                :include_docs true})
+        groups (into {} (map (fn [pa] [(.-group pa) (.-cache pa)]) patoms))]
     (.on ch "change" (fn [change]
                        (let [doc (js->clj ^js (.-doc change) :keywordize-keys true)
                              id (get doc :_id)
                              del? (get doc :_deleted)
-                             group (first (split id sep))
-                             db (get groups group)]
-                         (when-let [cache (and db (.-cache db))]
+                             group (first (split id sep))]
+                         (when-let [cache (get groups group)]
                            (when-not (or (= (get doc :_rev) (get-in @cache [id :_rev]))
                                          (and del? (not (contains? @cache id))))
                              (if del?
