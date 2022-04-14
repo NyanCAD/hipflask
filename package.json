@@ -6,6 +6,6 @@
     "shadow-cljs": "2.15.5"
   },
   "dependencies": {
-    "pouchdb": "^7.2.2"
+    "pouchdb": "^7.3.0"
   }
 }

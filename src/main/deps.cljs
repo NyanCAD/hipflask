@@ -1,1 +1,1 @@
-{:npm-deps {"pouchdb" "^7.2.2"}}
+{:npm-deps {"pouchdb" "^7.3.0"}}
