@@ -1,3 +1,7 @@
+; SPDX-FileCopyrightText: 2022 Pepijn de Vos
+;
+; SPDX-License-Identifier: MPL-2.0
+
 (ns hipflask-test
   (:require [cljs.test :refer (deftest is async use-fixtures)]
             [cljs.core.async :refer [go go-loop <!]]

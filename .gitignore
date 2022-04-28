@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2022 Pepijn de Vos
+#
+# SPDX-License-Identifier: MPL-2.0
+
 node_modules/
 public/js
 
@@ -15,6 +19,9 @@ pom.xml.asc
 .lein-*
 .nrepl-*
 .DS_Store
+.calva
+.clj-kondo
+.lsp
 
 .hgignore
 .hg/

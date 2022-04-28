@@ -1,3 +1,7 @@
+; SPDX-FileCopyrightText: 2022 Pepijn de Vos
+;
+; SPDX-License-Identifier: MPL-2.0
+
 (ns global-cookie-clicker.main
   (:require [reagent.core :as r]
             [reagent.dom :as rd]

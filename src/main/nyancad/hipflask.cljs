@@ -1,3 +1,7 @@
+; SPDX-FileCopyrightText: 2022 Pepijn de Vos
+;
+; SPDX-License-Identifier: MPL-2.0
+
 (ns nyancad.hipflask
   (:require ["pouchdb" :as PouchDB]
             [cljs.core.async :refer [go go-loop <!]]

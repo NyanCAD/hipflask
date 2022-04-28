@@ -1,3 +1,7 @@
+; SPDX-FileCopyrightText: 2022 Pepijn de Vos
+;
+; SPDX-License-Identifier: MPL-2.0
+
 (defproject org.clojars.pepijndevos/hipflask "0.10.1"
   :description "A pouch for rum, an atom that syncs"
   :url "https://github.com/NyanCAD/hipflask/"
