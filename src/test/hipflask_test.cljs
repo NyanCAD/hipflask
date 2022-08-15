@@ -99,3 +99,13 @@
                (is (= rev (get-in @pa ["group:doc0" :_rev])))
                (is (identical? de  @pa)))
              (done)))))
+
+(deftest atom-type
+  (let [db (pouchdb "testdb")
+        pa (pouch-atom db "group" (atom (sorted-map)))]
+    (async done
+           (go
+             (<! (done? pa)) ; wait for it to initialise before getting dereference
+             (<! (swap! pa update-in ["group:doc0" :number] inc))
+             (is (= (type @pa) cljs.core/PersistentTreeMap)) ; cache type is maintained
+             (done)))))

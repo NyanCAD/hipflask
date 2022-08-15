@@ -46,11 +46,11 @@
         (js->clj (.-rows docs) :keywordize-keys true)))
 
 (def sep ":")
-(defn- get-group [db group]
+(defn- get-group [db group cache]
   (let [docs (alldocs db #js{:include_docs true
                              :startkey (str group sep)
                              :endkey (str group sep "\ufff0")})]
-    (go (docs-into {} (<p! docs)))))
+    (go (swap! cache docs-into (<p! docs)))))
 
 (defn watch-changes [db & patoms]
   ; browsers allow 6 concurrent requests per domain
@@ -146,6 +146,6 @@
   ([db group] (pouch-atom db group (atom {})))
   ([db group cache]
    (PAtom. db group cache
-           (go (reset! cache (<! (get-group db group)))))))
+           (get-group db group cache))))
 
 (defn done? [^PAtom pa] (.-done? pa))
