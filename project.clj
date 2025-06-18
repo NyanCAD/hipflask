@@ -2,7 +2,7 @@
 ;
 ; SPDX-License-Identifier: MPL-2.0
 
-(defproject org.clojars.pepijndevos/hipflask "0.10.4"
+(defproject org.clojars.pepijndevos/hipflask "0.10.5"
   :description "A pouch for rum, an atom that syncs"
   :url "https://github.com/NyanCAD/hipflask/"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"

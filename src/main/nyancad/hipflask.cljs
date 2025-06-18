@@ -62,19 +62,22 @@
                                 :timeout 30000
                                 :heartbeat false
                                 :include_docs true})
-        groups (into {} (map (fn [pa] [(.-group pa) (.-cache pa)]) patoms))]
+        groups-atom (atom (into {} (map (fn [pa] [(.-group pa) (.-cache pa)]) patoms)))]
     (.on ch "change" (fn [change]
                        (let [doc (js->clj ^js (.-doc change) :keywordize-keys true)
                              id (get doc :_id)
                              del? (get doc :_deleted)
                              group (first (split id sep))]
-                         (when-let [cache (get groups group)]
+                         (when-let [cache (get @groups-atom group)]
                            (when-not (or (= (get doc :_rev) (get-in @cache [id :_rev]))
                                          (and del? (not (contains? @cache id))))
                              (if del?
                                (swap! cache dissoc id)
                                (swap! cache assoc id doc)))))))
-    #(.cancel ch)))
+    groups-atom))
+
+(defn add-watch-group [groups patom]
+  (swap! groups assoc (.-group patom) (.-cache patom)))
 
 (defn- pouch-swap! [db cache done? f x & args]
   (letfn [(prepare [old new] ; get the new values, filling in _id, _ref, _deleted
