@@ -23,9 +23,7 @@ This means your `swap!` function determines how conflicts are resolved - increme
 
 ### Important Considerations
 
-**Atomicity is per-document, not per-atom.** Each key in the atom corresponds to a separate CouchDB document. Concurrent updates to different keys always succeed independently, while concurrent updates to the *same* key trigger the retry mechanism.
-
-**Update functions should be idempotent** (or at least tolerate reapplication). During conflict resolution, your update function may be called multiple times with progressively newer state until it succeeds. Functions like `(update :count inc)` work well, while `(assoc :value x)` is effectively last-write-wins.
+**Atomicity is per-document, not per-atom.** Each key in the atom corresponds to a separate CouchDB document. Concurrent updates to different keys always succeed independently, while concurrent updates to the *same* key trigger the retry mechanism. This means update functions must be idempotent on a per-key basis, as each key may be retried independently.
 
 **Awaiting is optional.** You don't have to wait for `done?` if your UI gracefully handles an initially empty state that fills in asynchronously. Similarly, you don't have to await `swap!` calls unless you need sequential operations or want to catch validation errors (rejected writes are logged to the console).
 
