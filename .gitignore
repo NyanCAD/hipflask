@@ -15,6 +15,7 @@ pom.xml.asc
 *.jar
 *.log
 .shadow-cljs
+node-tests.js
 .idea
 .lein-*
 .nrepl-*
