@@ -8,7 +8,7 @@ SPDX-License-Identifier: MPL-2.0
 
 A ClojureScript atom interface to PouchDB/CouchDB for building offline-first collaborative applications.
 
-Hipflask transparently synchronizes application state between your UI and database, with automatic conflict resolution through retries. Works seamlessly with atom-based frameworks like [Reagent](https://reagent-project.github.io/), [Rum](https://github.com/tonsky/rum), and [re-frame](https://github.com/day8/re-frame).
+Hipflask transparently synchronizes application state between your UI and database, with automatic conflict resolution through retries. Works seamlessly with atom-based frameworks like [Reagent](https://reagent-project.github.io/) and [Rum](https://github.com/tonsky/rum).
 
 ## Philosophy
 
