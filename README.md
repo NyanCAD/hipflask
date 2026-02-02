@@ -8,7 +8,7 @@ SPDX-License-Identifier: MPL-2.0
 
 A ClojureScript atom interface to PouchDB/CouchDB for building offline-first collaborative applications.
 
-Hipflask transparently synchronizes application state between your UI and database, with automatic conflict resolution through retries. Works seamlessly with atom-based frameworks like [Reagent](https://reagent-project.github.io/) and [Rum](https://github.com/tonsky/rum), and can be integrated with [re-frame](https://github.com/day8/re-frame) via effects.
+Hipflask transparently synchronizes application state between your UI and database, with automatic conflict resolution through retries. Works seamlessly with atom-based frameworks like [Reagent](https://reagent-project.github.io/) and [Rum](https://github.com/tonsky/rum).
 
 ## Philosophy
 
@@ -113,52 +113,6 @@ Pass a Reagent ratom as the cache to get reactive updates:
    (for [[id {:keys [text done]}] (rum/react todos)]
      [:li {:key id :class (when done "done")} text])])
 ```
-
-## Usage with re-frame
-
-[re-frame](https://github.com/day8/re-frame) doesn't expose atoms directly, but you can integrate hipflask using effects and coeffects. The pattern involves syncing hipflask state with re-frame's app-db:
-
-```clojure
-(ns myapp.core
-  (:require [re-frame.core :as rf]
-            [nyancad.hipflask :refer [pouchdb pouch-atom watch-changes done?]]
-            [cljs.core.async :refer [go <!]]))
-
-(def pdb (pouchdb "myapp"))
-(def todos-atom (pouch-atom pdb "todos"))
-(watch-changes pdb todos-atom)
-
-;; Effect handler for hipflask writes
-(rf/reg-fx
-  :hipflask
-  (fn [{:keys [op id data]}]
-    (case op
-      :assoc (swap! todos-atom assoc id data)
-      :dissoc (swap! todos-atom dissoc id))))
-
-;; Watch hipflask for remote changes and sync to app-db
-(add-watch todos-atom :sync-to-reframe
-  (fn [_ _ _ new-state]
-    (rf/dispatch [:todos-updated new-state])))
-
-;; Event to receive hipflask updates
-(rf/reg-event-db :todos-updated
-  (fn [db [_ todos]]
-    (assoc db :todos todos)))
-
-;; Event that writes to both app-db and hipflask
-(rf/reg-event-fx :add-todo
-  (fn [{:keys [db]} [_ id text]]
-    {:db (assoc-in db [:todos id] {:text text :done false})
-     :hipflask {:op :assoc :id id :data {:text text :done false}}}))
-
-;; Initialize: load hipflask data into app-db
-(go
-  (<! (done? todos-atom))
-  (rf/dispatch [:todos-updated @todos-atom]))
-```
-
-This approach keeps re-frame's app-db as the source of truth for the UI while hipflask handles persistence and sync.
 
 ## API Reference
 
