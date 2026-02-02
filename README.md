@@ -23,7 +23,7 @@ This means your `swap!` function determines how conflicts are resolved - increme
 
 ### Important Considerations
 
-**Atomicity is per-document, not per-atom.** Each key in the atom corresponds to a separate CouchDB document. Concurrent updates to different keys always succeed independently, while concurrent updates to the *same* key trigger the retry mechanism. This means update functions must be idempotent on a per-key basis, as each key may be retried independently.
+**Atomicity is per-document, not per-atom.** Each key in the atom corresponds to a separate CouchDB document. Concurrent updates to different keys always succeed independently, while concurrent updates to the *same* key trigger the retry mechanism. This means update functions must be idempotent on a per-key basis, as each key may be retried independently. Keys can also be vectors for `update-in` style paths, where the first element is the document ID (e.g., `["doc-id" :field :subfield]`).
 
 **Awaiting is optional.** You don't have to wait for `done?` if your UI gracefully handles an initially empty state that fills in asynchronously. Similarly, you don't have to await `swap!` calls unless you need sequential operations or want to catch validation errors (rejected writes are logged to the console).
 
