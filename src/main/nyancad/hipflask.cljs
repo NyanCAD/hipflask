@@ -4,14 +4,40 @@
 
 (ns nyancad.hipflask
   (:require ["pouchdb" :as PouchDB]
+            ["pouchdb-find" :as PouchDBFind]
             [cljs.core.async :refer [go go-loop <!]]
             [cljs.core.async.interop :refer-macros [<p!]]
-            [clojure.string :refer [starts-with? split]]))
+            [clojure.string :refer [starts-with? split]])
+  (:refer-clojure :exclude [update-keys find]))
+
+; like json->clj but safe for single character keys with advanced compilation
+(defn json->clj [data]
+  (cond
+    (nil? data)
+    nil
+
+    (js/Array.isArray data)
+    (mapv #(json->clj %) data)
+
+    (= (.-constructor data) js/Object)
+    (into {}
+          (map (fn [[k v]]
+                 [(keyword k)
+                  (json->clj v)]))
+          (js/Object.entries data))
+
+    :else
+    data))
+
+; Install the find plugin
+(.plugin PouchDB PouchDBFind)
 
 (defn pouchdb [name] (PouchDB. name))
 (defn put [db doc] (.put db (clj->js doc)))
 (defn bulkdocs [db docs] ^js (.bulkDocs db (clj->js docs)))
 (defn alldocs [db options] ^js (.allDocs db options))
+(defn query [db view options] ^js (.query db view options))
+(defn find [db selector] ^js (.find db selector))
 
 (defn update-keys
   "Apply f to every valen in keys"
@@ -41,16 +67,46 @@
      (persistent! (transduce xform tombstone-conj! (transient to) from))
      (transduce xform tombstone-conj to from))))
 
-(defn- docs-into [m ^js docs]
-  (into m (map #(vector (get % :id) (get % :doc)))
-        (js->clj (.-rows docs) :keywordize-keys true)))
+(defn- docs-into
+  ([m ^js docs] (docs-into m docs :doc))
+  ([m ^js docs key]
+   (into m (map #(vector (get % :id) (get % key)))
+         (json->clj (.-rows docs)))))
 
 (def sep ":")
-(defn- get-group [db group cache]
-  (let [docs (alldocs db #js{:include_docs true
-                             :startkey (str group sep)
-                             :endkey (str group sep "\ufff0")})]
-    (go (swap! cache docs-into (<p! docs)))))
+
+(defn get-group
+  ([db group] (get-group db group nil {}))
+  ([db group limit] (get-group db group limit {}))
+  ([db group limit target]
+   (let [docs (alldocs db #js{:include_docs true
+                              :attachments true
+                              :startkey (str group sep)
+                              :endkey (str group sep "\ufff0")
+                              :limit limit})]
+     (go (docs-into target (<p! docs))))))
+
+(defn get-view-group
+  ([db view prefix] (get-view-group db view prefix nil))
+  ([db view prefix limit]
+   (let [result (query db view #js{:startkey prefix
+                                   :endkey (str prefix "\ufff0")
+                                   :include_docs false
+                                   :limit limit})]
+     (go (docs-into {} (<p! result) :value)))))
+
+(defn get-mango-group
+  ([db selector] (get-mango-group db selector nil))
+  ([db selector limit]
+   (go
+     (let [result (find db #js{:selector (clj->js selector)
+                               :limit limit})
+           response (<p! result)
+           docs (json->clj (.-docs ^js response))]
+       (into {} (map (juxt :_id identity)) docs)))))
+
+(defn- init-cache [db group cache]
+  (go (reset! cache (<! (get-group db group nil (empty @cache))))))
 
 (defn watch-changes [db & patoms]
   ; browsers allow 6 concurrent requests per domain
@@ -61,10 +117,11 @@
                                 :live true
                                 :timeout 30000
                                 :heartbeat false
-                                :include_docs true})
+                                :include_docs true
+                                :attachments true})
         groups-atom (atom (into {} (map (fn [pa] [(.-group pa) (.-cache pa)]) patoms)))]
     (.on ch "change" (fn [change]
-                       (let [doc (js->clj ^js (.-doc change) :keywordize-keys true)
+                       (let [doc (json->clj ^js (.-doc change))
                              id (get doc :_id)
                              del? (get doc :_deleted)
                              group (first (split id sep))]
@@ -79,7 +136,7 @@
 (defn add-watch-group [groups patom]
   (swap! groups assoc (.-group patom) (.-cache patom)))
 
-(defn- pouch-swap! [db cache done? f x & args]
+(defn- pouch-swap! [db cache done? validator f x & args]
   (letfn [(prepare [old new] ; get the new values, filling in _id, _ref, _deleted
             (for [[id {rev :_rev}] old]
               (if-let [newdoc (get new id)]
@@ -112,6 +169,8 @@
       (<! done?) ; sequentialize operations to avoid needless conflicts, over twice as fast
       (loop [docs (into {} (map (let [c @cache] #(vector % (get c %)))) (keyset x))]
         (let [updocs (apply f docs (if (set? x) (keys docs) x) args)] ; apply f
+          (when (and validator (not (validator updocs)))
+            (throw (ex-info "Validator rejected reference state" {:docs updocs})))
           (if (= docs updocs)
             @cache ; nothing changed, no need to do anything
             (let [prepdocs (prepare docs updocs) ; prepare for sending to PouchDB
@@ -128,7 +187,7 @@
                 (let [p (alldocs db (clj->js {:include_docs true :keys (keys errdocs)}))]
                   (recur (docs-into {} (<p! p)))))))))))) ; recur with remaining documents
 
-(deftype PAtom [db group cache ^:mutable done?]
+(deftype PAtom [db group cache ^:mutable done? ^:mutable validator]
   IAtom
 
   IDeref
@@ -136,9 +195,9 @@
 
   ISwap
   (-swap! [_a _f]         (throw (js/Error "Pouch atom assumes first argument is a key")))
-  (-swap! [_a f x]        (set! done? (pouch-swap! db cache done? f x)))
-  (-swap! [_a f x y]      (set! done? (pouch-swap! db cache done? f x y)))
-  (-swap! [_a f x y more] (set! done? (apply pouch-swap! db cache done? f x y more)))
+  (-swap! [_a f x]        (set! done? (pouch-swap! db cache done? validator f x)))
+  (-swap! [_a f x y]      (set! done? (pouch-swap! db cache done? validator f x y)))
+  (-swap! [_a f x y more] (set! done? (apply pouch-swap! db cache done? validator f x y more)))
 
   IWatchable
   (-notify-watches [_this old new] (-notify-watches cache old new))
@@ -149,6 +208,7 @@
   ([db group] (pouch-atom db group (atom {})))
   ([db group cache]
    (PAtom. db group cache
-           (get-group db group cache))))
+           (init-cache db group cache)
+           nil)))
 
 (defn done? [^PAtom pa] (.-done? pa))

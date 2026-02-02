@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 node_modules/
+package-lock.json
 public/js
 
 /target
@@ -15,6 +16,7 @@ pom.xml.asc
 *.jar
 *.log
 .shadow-cljs
+node-tests.js
 .idea
 .lein-*
 .nrepl-*
