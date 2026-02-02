@@ -148,6 +148,8 @@ The first argument to `swap!` must be either:
 - A set of keys - for `update-keys`
 - A map - for `into`
 
+Using `update-in` provides finer-grained conflict resolution than `assoc` - on retry, only the targeted path is modified using the latest document state, rather than replacing the whole document.
+
 ```clojure
 ;; Single document operations
 (swap! pa assoc "group:id" {:data "value"})
