@@ -102,7 +102,7 @@
      (let [result (find db #js{:selector (clj->js selector)
                                :limit limit})
            response (<p! result)
-           docs (json->clj (.-docs response))]
+           docs (json->clj (.-docs ^js response))]
        (into {} (map (juxt :_id identity)) docs)))))
 
 (defn- init-cache [db group cache]
