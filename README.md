@@ -21,6 +21,14 @@ Hipflask embraces CouchDB's optimistic concurrency model:
 
 This means your `swap!` function determines how conflicts are resolved - incrementing a counter will correctly accumulate all increments, while replacing a value will use the last write.
 
+### Important Considerations
+
+**Atomicity is per-document, not per-atom.** Each key in the atom corresponds to a separate CouchDB document. Concurrent updates to different keys always succeed independently, while concurrent updates to the *same* key trigger the retry mechanism.
+
+**Update functions should be idempotent** (or at least tolerate reapplication). During conflict resolution, your update function may be called multiple times with progressively newer state until it succeeds. Functions like `(update :count inc)` work well, while `(assoc :value x)` is effectively last-write-wins.
+
+**Awaiting is optional.** You don't have to wait for `done?` if your UI gracefully handles an initially empty state that fills in asynchronously. Similarly, you don't have to await `swap!` calls unless you need sequential operations or want to catch validation errors (rejected writes are logged to the console).
+
 ## Features
 
 - **Atom interface** - Use familiar `swap!`, `deref`, and `add-watch`
@@ -63,12 +71,17 @@ Add to your `deps.edn` or `project.clj`:
 ;; Watch for remote changes
 (watch-changes db todos)
 
-;; Wait for initial load, then use like a normal atom
+;; Optional: wait for initial load (or let UI handle empty state)
 (go
   (<! (done? todos))
+  (println "Loaded:" @todos))
 
-  ;; Add a document
-  (<! (swap! todos assoc "todos:1" {:text "Buy milk" :done false}))
+;; Use like a normal atom - awaiting is optional for non-sequential ops
+(swap! todos assoc "todos:1" {:text "Buy milk" :done false})
+
+;; Await only if you need sequential operations or to catch errors
+(go
+  (<! (swap! todos assoc "todos:2" {:text "Buy eggs" :done false}))
 
   ;; Update a document
   (<! (swap! todos update-in ["todos:1" :done] not))
