@@ -23,7 +23,7 @@ This means your `swap!` function determines how conflicts are resolved - increme
 
 ### Important Considerations
 
-**Atomicity is per-document, not per-atom.** Each key in the atom corresponds to a separate CouchDB document. Concurrent updates to different keys always succeed independently, while concurrent updates to the *same* key trigger the retry mechanism. This means update functions must be idempotent on a per-key basis, as each key may be retried independently. Keys can also be vectors for `update-in` style paths, where the first element is the document ID (e.g., `["doc-id" :field :subfield]`).
+**Atomicity is per-document, not per-atom.** Each key in the atom corresponds to a separate CouchDB document. Concurrent updates to different keys always succeed independently, while concurrent updates to the *same* key trigger the retry mechanism. This means update functions must be idempotent on a per-key basis, as each key may be retried independently.
 
 **Awaiting is optional.** You don't have to wait for `done?` if your UI gracefully handles an initially empty state that fills in asynchronously. Similarly, you don't have to await `swap!` calls unless you need sequential operations or want to catch validation errors (rejected writes are logged to the console).
 
@@ -144,6 +144,7 @@ Pass a Reagent ratom as the cache to get reactive updates:
 
 The first argument to `swap!` must be either:
 - A key (string) - for `assoc`, `update`, `dissoc`
+- A vector path - for `update-in`, `assoc-in` (first element is the document ID)
 - A set of keys - for `update-keys`
 - A map - for `into`
 
@@ -151,6 +152,7 @@ The first argument to `swap!` must be either:
 ;; Single document operations
 (swap! pa assoc "group:id" {:data "value"})
 (swap! pa update "group:id" merge {:more "data"})
+(swap! pa update-in ["group:id" :count] inc)
 (swap! pa dissoc "group:id")  ; deletes document
 
 ;; Bulk operations
